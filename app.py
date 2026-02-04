@@ -4,10 +4,24 @@ from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
+
+# 1. Use an Environment Variable for the Secret Key
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-fallback')
+
+# 2. Logic to switch between Neon (Production) and SQLite (Local)
+database_url = os.environ.get('DATABASE_URL') 
+if database_url and database_url.startswith("postgres://"):
+    # Fix for SQLAlchemy: it requires 'postgresql://' instead of 'postgres://'
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Session stays for 24 hours
+
+# 3. Add Engine Options to handle serverless connection recycling
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
 
 db = SQLAlchemy(app)
 
